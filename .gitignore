@@ -1,0 +1,19 @@
+# Generic pattern for course folders starting with course codes (e.g. 1AEL...)
+1A[A-Z0-9]*
+
+# Ignore specific files
+Calendario-Academico-*.pdf
+
+# Python / editor temporary files
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+env/
+venv/
+
+# VSCode
+.vscode/
+
+# Pipenv
+#Pipfile.lock
