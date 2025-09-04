@@ -12,10 +12,12 @@ import json
 import pdfplumber
 from typing import Optional
 
+
 class Course:
     """
     Representa un curso académico.
     """
+    FILENAME_PATTERN = re.compile(r"^UG-(?P<period>\d{6})_(?P<id>[A-Z0-9_\-]{8})-(?P<nrc>\d{4})\.pdf$")
     def __init__(self, course_code: str, name: str = "", period: str = "", faculty: str = "", credits: Optional[int] = None, weeks: Optional[int] = None, area: str = "", nrc: str = ""):
         self.course_id: str = course_code
         self.course_name: str = name
@@ -38,7 +40,21 @@ class Course:
         - Usar el nombre de archivo para extraer código y NRC (regex comprobada).
         - Extraer texto del PDF (pdfplumber) y aplicar heurísticas/regex para campos comunes.
         - Devolver un objeto Course (campos faltantes quedan vacíos o None).
+        """
+        filename = os.path.basename(filepath)
+        # Primero, intentar extraer datos del filename
+        fname_re = re.compile(cls.FILENAME_PATTERN, re.IGNORECASE)
+        m = fname_re.match(filename)
+        course_code = ""
+        nrc = ""
+        period_code = ""
+        if m:
+            period_code = m.group(1)
+            course_code = m.group(2)
+            nrc = m.group(3)
 
+        # Extraer texto del PDF (concatenar páginas)
+        """
         Ejemplo de informacion del curso:
         INFORMACIÓN GENERAL
         Nombre del Curso : Análisis de Circuitos Eléctricos 2
@@ -50,19 +66,6 @@ class Course:
         Área o programa : INGENIERÍA BIOMÉDICA,INGENIERÍA ELECTRÓNICA
         NRC (Código de Registro de Nombre) : 8281
         """
-        filename = os.path.basename(filepath)
-        # Primero, intentar extraer datos del filename
-        fname_re = re.compile(r"^UG-(\d{6})_([A-Za-z0-9_\-]+)-(\d+)\.?pdf$", re.IGNORECASE)
-        m = fname_re.match(filename)
-        course_code = ""
-        nrc = ""
-        period_code = ""
-        if m:
-            period_code = m.group(1)
-            course_code = m.group(2)
-            nrc = m.group(3)
-
-        # Extraer texto del PDF (concatenar páginas)
         text = ""
         try:
             with pdfplumber.open(filepath) as pdf:
@@ -96,12 +99,12 @@ class Course:
 
     @classmethod
     def find_course_path(cls, directory: str) -> list[str]:
-        """Buscar todos los archivos PDF de sílabos que cumplan el patrón en `directory`.
-
+        """
+        Buscar todos los archivos PDF de sílabos que cumplan el patrón en `directory`.
         Devuelve una lista de rutas absolutas a PDFs que coinciden.
         """
         matches: list[str] = []
-        pattern = re.compile(r"^UG-(\d{6})_([A-Za-z0-9_\-]+)-(\d+)\.?pdf$", re.IGNORECASE)
+        pattern = re.compile(cls.FILENAME_PATTERN, re.IGNORECASE)
         for entry in os.scandir(directory):
             if entry.is_file() and entry.name.lower().endswith('.pdf'):
                 if pattern.match(entry.name):
