@@ -68,8 +68,8 @@ class SyllabusRaw:
     @property
     def nrc(self) -> str:
         return self._parse_filename().get('nrc', '')
-    
-    def _get_section(self,section_name:str):
+
+    def _get_section(self,section_name:str) -> str:
         if section_name not in self.SECTION_NAMES:
             raise ValueError(f"Section name '{section_name}' is not recognized.")
         in_section = False
@@ -83,10 +83,10 @@ class SyllabusRaw:
                 if in_section:
                     # Si encontramos otra sección, terminamos.
                     if line in self.SECTION_NAMES:
-                        break
+                        return "\n".join(section_content)
                     # Si estamos en la sección, extraemos el texto.
                     section_content.append(line)
-        return "\n".join(section_content)
+        
     
     @property
     def general_info(self) -> str:
@@ -175,7 +175,8 @@ class Course:
             # Cuerpo académico :  Rojas Quispe, Ricardo Valentin
             # Créditos : 4
             # Semanas : 16
-            # Área o programa : INGENIERÍA BIOMÉDICA,INGENIERÍA ELECTRÓNICA
+            # Área o programa 
+            # : INGENIERÍA BIOMÉDICA,INGENIERÍA ELECTRÓNICA
             # NRC (Código de Registro de Nombre) : 8281
             out = {}
             if not text:
@@ -191,16 +192,18 @@ class Course:
             out['id'] = search_label('Código del curso')
             out['period'] = search_label('Periodo')
             out['faculty'] = parse_bullet_list(search_label('Cuerpo académico'))
-            credits = search_label('Créditos')
-            if credits:
-                m = re.search(r"(\d+)", credits)
-                out['credits'] = int(m.group(1)) if m else None
-            weeks = search_label('Semanas')
-            if weeks:
-                m = re.search(r"(\d+)", weeks)
-                out['weeks'] = int(m.group(1)) if m else None
-            careers = search_label('Área o programa')
-            out['area'] = careers.split(',') if careers else []
+            out['credits'] = int(search_label('Créditos'))
+            out['weeks'] = int(search_label('Semanas'))
+            
+            # search_label('Área o programa') no funciona aquí porque el campo puede estar en dos líneas
+            # Ejemplos:
+            # \n: INGENIERÍA BIOMÉDICA,INGENIERÍA ELECTRÓNICA\nÁrea o programa\n
+            # \n: INGENIERÍA BIOMÉDICA,INGENIERÍA\nÁrea o programa ELECTRÓNICA,INGENIERÍA MECATRÓNICA\n
+            rx = re.compile(r"\n:\s*(?P<area_1>[^\n]+)\nÁrea o programa[ \t]*(?P<area_2>[^\n]*)\n", re.MULTILINE)
+            if m := rx.search(text):
+                careers = m.group('area_1') if not m.group('area_2') else m.group('area_1') + ' ' + m.group('area_2')
+                out['area'] = careers.split(',') if careers else [careers]
+                
             nrc = search_label('NRC')
             try:
                 out['nrc'] = int(nrc)
@@ -446,14 +449,24 @@ def weeks_to_dates(period: str, week1: int, week2: Optional[int]=None) -> tuple[
 #ETL
 def extract(directory: str) -> list[SyllabusRaw]:
     """Recorrer subdirectorios, encontrar PDFs de sílabos, leerlos en raw."""
+    from concurrent.futures import ThreadPoolExecutor, as_completed
     syllabi_raw = []
     try:
-        syllabi_path = SyllabusRaw.find_syllabi(directory) 
+        syllabi_path = SyllabusRaw.find_syllabi(directory)
         print(f'Extracting syllabi from {len(syllabi_path)} PDF files in "{directory}"')
-        for pdfpath in syllabi_path:
+
+        def process(pdfpath):
             raw = SyllabusRaw.from_pdf(pdfpath)
-            syllabi_raw.append(raw)
-            print(f'File extracted: "{raw.filename}"')
+            print(f'File extracted: "{os.path.relpath(raw.filepath, directory)}"')
+            return raw
+
+        with ThreadPoolExecutor() as executor:
+            futures = [executor.submit(process, pdfpath) for pdfpath in syllabi_path]
+            for future in as_completed(futures):
+                try:
+                    syllabi_raw.append(future.result())
+                except Exception as e:
+                    print(f'Error processing file: {e}')
     except Exception as e:
         print(f'Error extracting syllabi: {e}')
     return syllabi_raw
@@ -484,10 +497,13 @@ def load(courses: list[Course], dest_dir: str='') -> list[str]:
             print(f'Error saving course "{course}": {e}')
     return paths
     
+if __name__ == "__main__":
+    # Ejecutar el proceso ETL completo en el directorio actual
+    cwd = os.getcwd()
+    print(f'Running ETL process in directory: "{cwd}"')
+    syllabi_raw = extract(cwd)
 
-cwd = os.getcwd()
-syllabi_raw = extract(cwd)
+    courses = transform(syllabi_raw)
 
-courses = transform(syllabi_raw)
-
-loaded_paths = load(courses, os.path.join(cwd, 'cursos_json'))
+    loaded_paths = load(courses, os.path.join(cwd, 'cursos_json'))
+    print(f'ETL process completed. {len(loaded_paths)} courses saved to "cursos_json" directory.')
