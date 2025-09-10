@@ -3,6 +3,10 @@
 
 # Ignore specific files
 Calendario-Academico-*.pdf
+test.py
+
+# Ignore saved JSON files
+cursos_json/
 
 # Python / editor temporary files
 __pycache__/
