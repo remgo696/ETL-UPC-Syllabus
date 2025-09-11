@@ -248,9 +248,9 @@ class Course:
         units = [Unit(**u) for u in data.get('units', [])]
         assessments = [Exam(**a) for a in data.get('assessments', [])]
         return cls(
-            id=data.get('id', ''),
-            name=data.get('name', ''),
-            period=data.get('period', ''),
+            id=data.get('id', '1AXX0000'),
+            name=data.get('name', 'Course Name'),
+            period=data.get('period', '2025-2'),
             faculty=data.get('faculty', []),
             credits=data.get('credits'),
             weeks=data.get('weeks'),
@@ -327,47 +327,97 @@ class Unit:
         """Parsea la tabla de unidades y devuelve una lista de instancias Unit.
         period: periodo académico en formato "YYYY-T", por ejemplo, "2025-2"
         """
-        header = ['SEMANA', 'TEMARIO', 'ACTIVIDADES DE\nAPRENDIZAJE', 'EVIDENCIAS DE\nAPRENDIZAJE', 'BIBLIOGRAFÍA']
+        def clean_table_structure(table: list[list[str]]) -> list[list[str]]:
+            """Limpia la tabla eliminando filas vacías y combinando filas partidas.
+            Retorna una tabla limpia.
+            """
+            table = table.copy()
+            def join_with_previous(index:int): # no devuelve nada, modifica table in-place
+                if index <= 0 or index >= len(table):
+                    return
+                if index <= 0 or index >= len(table):
+                    return
+                prev_row = table[index-1]
+                curr_row = table[index]
+                # Concatenate each column, preserving all columns
+                new_row = [
+                    (prev.strip() + ' ' + curr.strip()).strip() if curr else prev
+                    for prev, curr in zip(prev_row, curr_row)
+                ]
+                # If curr_row has more columns than prev_row, append them
+                if len(curr_row) > len(prev_row):
+                    new_row.extend(curr_row[len(prev_row):])
+                table[index-1] = new_row
+                del table[index]
+            i=0
+            while i < len(table):
+                # La tabla debería empezar con "Unidad n. X: Título"
+                if not table[i][0].startswith("Unidad n."):
+                    raise ValueError(f"Invalid unit title format: {table[i][0]}")
+                i += 1
+                # Le sigue la fila de competencias
+                if not table[i][0].startswith("COMPETENCIA (S):"):
+                    raise ValueError(f"Invalid competition format: {table[i][0]}")
+                i += 1
+                # Puede que la anterior fila (competencias) esté partida. Después está la fila de los logros.
+                while i < len(table) and not table[i][0].startswith("LOGRO DE LA UNIDAD:"):
+                    if i == len(table)-1:
+                        raise ValueError(f"Invalid achievement format: {table[i][0]}")
+                    # Si encuentro una fila partida, la junto con la anterior
+                    join_with_previous(i)
+                i += 1
+                # Puede que la fila de logros también esté partida. Después está el encabezado de la tabla de semanas.
+                while i < len(table) and not table[i][0].startswith("SEMANA"):
+                    if i == len(table)-1:
+                        raise ValueError(f"Invalid header format: {table[i]}")
+                    join_with_previous(i)
+                i += 1
+                # Le sigue la fila de contenido de semanas
+                if not table[i][0].startswith("Semana"):
+                    raise ValueError(f"Invalid week format: {table[i][0] if i < len(table) else 'EOF'}")
+                i += 1  # Saltar la fila de la primera unidad
+                # Puede que la fila de semanas también esté partida. Después empieza la siguiente unidad o el final de la tabla
+                while i < len(table) and not table[i][0].startswith("Unidad n."):
+                    join_with_previous(i)
+                # Ahora i apunta a la siguiente unidad o al final de la tabla
+            return table
+        
+        def parse_title(line: str) -> tuple[int, str]:
+            match = re.match(r"^Unidad n\. (?P<numero>\d+): (?P<titulo>.+)", line)
+            if match:
+                number = int(match.group("numero"))
+                title = match.group("titulo")
+                return number, title
+            raise ValueError(f"Invalid unit title format: {line}")
+
+        def parse_week(row: list[str]) -> int:
+            row = [field.replace("\n", " ") for field in row]  #limpio los campos
+            parsed = re.match(r"Semana (?P<semana1>[\d,\s-]+)\s*-\s*(?P<semana2>[\d,\s-]+)", row[0])
+            if parsed:
+                # Extraer semanas
+                week1 = int(parsed.group("semana1"))
+                week2 = int(parsed.group("semana2"))
+            else:
+                raise ValueError(f"Invalid week format: {row[0]}")
+            syllabus = parse_bullet_list(row[1])
+            activities = parse_bullet_list(row[2])
+            exams = parse_bullet_list(row[3])
+            bibliography = parse_bullet_list(row[4])
+            return week1, week2, syllabus, activities, exams, bibliography
         units = []
-        i=-1
-        while i < len(table)-1:
-            row = table[i := i + 1]
-            if row[0].startswith("Unidad n."): #Empiezan las unidades
-                # Extraer número y título
-                match = re.match(r"^Unidad n\. (?P<numero>\d+): (?P<titulo>.+)", row[0])
-                if match:
-                    number = int(match.group("numero"))
-                    title = match.group("titulo")
-            else:
-                continue
-            row = table[i := i + 1]    # La siguiente fila deberían ser las competencias. Las ignoro por ahora
-            if row[0].startswith("COMPETENCIA (S):"):
-                pass
-            else:
-                continue
-            row = table[i := i + 1]    # La siguiente fila debería ser el logro
-            if row[0].startswith("LOGRO DE LA UNIDAD:"):
-                _, achievement = row[0].split(":", 1)
-                achievement = achievement.strip()
-            else:
-                continue
-            row = table[i := i + 1]    # Las siguientes filas contienen la tabla que describe la unidad en sí
-            if row[0] != header[0]:
-                continue
-            row = table[i := i + 1]
-            if row[0].startswith("Semana"):
-                row = [field.replace("\n", " ") for field in row]  #limpio los campos
-                parsed = re.match(r"Semana (?P<semana1>[\d,\s-]+) - (?P<semana2>[\d,\s-]+)", row[0])
-                if parsed:
-                    # Extraer semanas
-                    week1 = int(parsed.group("semana1"))
-                    week2 = int(parsed.group("semana2"))
-                syllabus = parse_bullet_list(row[1])
-                activities = parse_bullet_list(row[2])
-                exams = parse_bullet_list(row[3])
-                bibliography = parse_bullet_list(row[4])
-            else:
-                continue
+        
+        # Cleanning raw table
+        table = clean_table_structure(table)
+        # Cada unidad ocupa 5 filas en la tabla limpia
+        for i in range(0,len(table),5):
+            #Empiezan las unidades
+            number, title = parse_title(table[i][0])
+            i += 2  # La siguiente fila deberían ser las competencias. Las ignoro por ahora
+            # Empiezan los logros
+            achievement = table[i][0].replace("LOGRO DE LA UNIDAD:", "").strip()
+            i += 2  # Las siguientes filas contienen la tabla que describe la unidad en sí. Ignoro el encabezado
+            # Empieza la tabla de semanas
+            week1, week2, syllabus, activities, exams, bibliography = parse_week(table[i])
             units.append(
                 cls(number, title, achievement, week1, week2, syllabus=syllabus, period=period, activities=activities, exams=exams, bibliography=bibliography))
         return units
@@ -402,8 +452,9 @@ class Exam:
         for row in table:
             if row == header:
                 continue  # Saltar las filas de encabezado. Normalmente se repiten en las filas impares
-            row = [field.strip() for field in row]
+            row = [field.replace('\n', ' ').strip() for field in row]
             name, abrev = row[0].split('-', 1) if '-' in row[0] else (row[0], '')
+            abrev = abrev.strip()
             # Validar y convertir semana a entero
             week_raw = row[3]
             try:
@@ -424,7 +475,9 @@ class Exam:
                 week=week
             )
             exams.append(exam)
-        return exams
+        total_weight = sum(e.weight for e in exams)
+        if total_weight != 100.0:
+            print(f"Warning: Total exam weight is {total_weight}%, which does not equal 100%.")
         return exams
 
 # Utils
@@ -441,7 +494,10 @@ def weeks_to_dates(period: str, week1: int, week2: Optional[int]=None) -> tuple[
     if week2:
         if week1 > week2:
             raise ValueError("Rango de semanas inválido: la semana inicial no puede ser mayor que la semana final.")
-        end_date = config.end_date(period) + timedelta(weeks=week2-1)
+        end_date = config.start_date(period) + timedelta(weeks=week2, days=-2)
+        if end_date > config.end_date(period):
+            end_date = config.end_date(period) # ajustar al final del periodo si aplica
+            
     else:
         end_date = start_date + timedelta(days=5)  # Por defecto, una semana dura 6 días hábiles
     return start_date, end_date
@@ -480,7 +536,7 @@ def transform(syllabi: list[SyllabusRaw]) -> list[Course]:
             courses.append(course)
             print(f'Course transformed: "{course}"')
     except Exception as e:
-        print(f'Error transforming syllabi: {e}')
+        print(f'Error transforming syllabus {syllabus.filename}: {e}')
     return courses
 
 # Guardar los cursos en archivos JSON. Uno por curso
