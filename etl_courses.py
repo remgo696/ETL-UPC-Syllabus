@@ -552,6 +552,7 @@ def load(courses: list[Course], dest_dir: str='') -> list[str]:
         except Exception as e:
             print(f'Error saving course "{course}": {e}')
     return paths
+
     
 if __name__ == "__main__":
     # Ejecutar el proceso ETL completo en el directorio actual
@@ -563,3 +564,11 @@ if __name__ == "__main__":
 
     loaded_paths = load(courses, os.path.join(cwd, 'cursos_json'))
     print(f'ETL process completed. {len(loaded_paths)} courses saved to "cursos_json" directory.')
+
+    # Compila todos los cursos en un solo archivo JSON
+    all_courses = [course.to_dict() for course in courses]
+    all_courses_path = os.path.join(cwd, 'cursos_json', 'all_courses.json')
+    with open(all_courses_path, 'w', encoding='utf-8') as f:
+        json.dump(all_courses, f, ensure_ascii=False, indent=4)
+    print(f'All courses saved to JSON: "{all_courses_path}"')
+
