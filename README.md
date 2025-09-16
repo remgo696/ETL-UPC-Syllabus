@@ -30,13 +30,16 @@ proyecto/
 ├── etl_courses.py
 ├── config.json
 ├── Pipfile
+├── UG-202520_1AEL0244-8281.pdf
+├── /
+│   └── UG-202520_1AEL0244-8281.pdf
 ├── 1AEL0244 Análisis de Circuitos Eléctricos 2/
 │   └── UG-202520_1AEL0244-8281.pdf
 ├── ...
 ```
 
 ## Cómo ejecutar el script
-1. Asegúrate de que los archivos PDF de los sílabos estén en las carpetas correspondientes.
+1. Asegúrate de que los archivos PDF de los sílabos estén en la carpeta del proyecto.
 2. Abre la terminal en la carpeta del proyecto.
 3. Activa el entorno virtual:
    ```cmd
