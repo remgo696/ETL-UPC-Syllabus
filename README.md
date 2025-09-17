@@ -12,6 +12,22 @@ Este proyecto extrae información estructurada de los sílabos en PDF de cursos 
 ## Requisitos previos
 - **Python 3.8 o superior**
 - **pipenv** (gestor de entornos y dependencias)
+- **Git** (para clonar el repositorio)
+
+## Cómo descargar el proyecto
+1. **Clona el repositorio desde GitHub:**
+   ```cmd
+   git clone https://github.com/remgo696/ETL-UPC-Syllabus.git
+   ```
+2. **Navega a la carpeta del proyecto:**
+   ```cmd
+   cd ETL-UPC-Syllabus
+   ```
+
+Alternativamente, puedes descargar el proyecto como archivo ZIP desde GitHub:
+- Ve a [https://github.com/remgo696/ETL-UPC-Syllabus](https://github.com/remgo696/ETL-UPC-Syllabus)
+- Haz clic en "Code" → "Download ZIP"
+- Extrae el archivo y navega a la carpeta
 
 ## Instalación de dependencias
 1. Abre la terminal (cmd o PowerShell) en la carpeta del proyecto.
