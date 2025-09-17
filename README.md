@@ -7,6 +7,7 @@ Este proyecto extrae información estructurada de los sílabos en PDF de cursos 
 - Extrae datos relevantes (nombre, código, NRC, unidades, evaluaciones, etc.).
 - Convierte la información a un formato estructurado (JSON).
 - Guarda un archivo JSON por curso y un archivo con todos los cursos juntos.
+- Genera un calendario semanal en PDF con todas las evaluaciones programadas.
 
 ## Requisitos previos
 - **Python 3.8 o superior**
@@ -22,7 +23,7 @@ Este proyecto extrae información estructurada de los sílabos en PDF de cursos 
    ```cmd
    pipenv install
    ```
-   Esto instalará automáticamente todas las librerías necesarias (por ejemplo, `pdfplumber`).
+   Esto instalará automáticamente todas las librerías necesarias (`pdfplumber`, `reportlab`).
 
 ## Estructura esperada de carpetas
 ```
@@ -30,28 +31,36 @@ proyecto/
 ├── etl_courses.py
 ├── config.json
 ├── Pipfile
-├── UG-202520_1AEL0244-8281.pdf
-├── /
-│   └── UG-202520_1AEL0244-8281.pdf
-├── 1AEL0244 Análisis de Circuitos Eléctricos 2/
-│   └── UG-202520_1AEL0244-8281.pdf
-├── ...
+├── raw/                          # Carpeta de entrada
+│   ├── 1AEL0244 Análisis de Circuitos Eléctricos 2/
+│   │   └── UG-202520_1AEL0244-8281.pdf
+│   └── ...
+└── data/                         # Carpeta de salida (se crea automáticamente)
+    ├── {curso}-{nrc}.json
+    ├── all_courses.json
+    └── weekly_calendar.pdf
 ```
 
+
 ## Cómo ejecutar el script
-1. Asegúrate de que los archivos PDF de los sílabos estén en la carpeta del proyecto.
+1. Asegúrate de que los archivos PDF de los sílabos estén en las carpetas correspondientes.
 2. Abre la terminal en la carpeta del proyecto.
 3. Activa el entorno virtual:
    ```cmd
    pipenv shell
    ```
-4. Ejecuta el script:
+4. Ejecuta el script especificando carpeta de entrada y salida:
    ```cmd
-   python etl_courses.py
+   python etl_courses.py raw data
    ```
-5. Al finalizar, encontrarás los archivos JSON en la carpeta `cursos_json`.
-   - Un archivo por curso.
-   - Un archivo `all_courses.json` con todos los cursos juntos.
+   - `raw`: Carpeta donde están los archivos PDF de sílabos
+   - `data`: Carpeta donde se guardarán los resultados
+
+## Archivos generados
+Al finalizar, encontrarás los siguientes archivos en la carpeta de salida:
+- **Archivos individuales:** Un archivo JSON por curso (`{nombre_curso}-{nrc}.json`)
+- **Archivo consolidado:** `all_courses.json` con todos los cursos juntos
+- **Calendario PDF:** `weekly_calendar.pdf` con cronograma semanal de evaluaciones
 
 ## Notas adicionales
 - Si agregas nuevos sílabos, vuelve a ejecutar el script para actualizar los archivos JSON.
